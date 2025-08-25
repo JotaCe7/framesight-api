@@ -1,7 +1,10 @@
+import time
+from typing import Callable
+
 import numpy as np
 import cv2
 import uvicorn
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from ultralytics import YOLO
 
@@ -17,6 +20,25 @@ app = FastAPI(
     version="1.0.0",
 )
 
+# --- 2. Add Middleware ---
+@app.middleware("http")
+async def add_process_time_header(request: Request, call_next: Callable) -> Response:
+    """
+    Adds a custome header X-Process-Time to the response with the request processing time.
+    
+    Args:
+        request (Request): The incoming request object.
+        call_next (Callable): The next function in the middleware chain.
+        
+    Returns:
+        Response: The response object with the added "X-Process-Time" header.
+    """
+    start_time = time.time()
+    response = await call_next(request)
+    process_time = time.time() - start_time
+    response.headers["X-Process-Time"] = str(process_time)
+    return response
+
 origins = ["*"] # For development, allow all origins.
 app.add_middleware(
     CORSMiddleware,
@@ -26,7 +48,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- 2. API Endpoints ---
+# --- 3. API Endpoints ---
 
 @app.post("/detect/")
 async def detect_objects(file: UploadFile = File(...)) -> dict:
